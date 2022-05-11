@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import 'package:chat_app/helpers/mostrar_alerta.dart';
+import 'package:chat_app/services/auth_service.dart';
 import 'package:chat_app/widgets/custom_input.dart';
 import 'package:chat_app/widgets/widgets.dart';
 
@@ -39,22 +42,18 @@ class _Form extends StatefulWidget {
 }
 
 class __FormState extends State<_Form> {
-  final nameCtrl = TextEditingController();
   final emailCtrl = TextEditingController();
   final passCtrl = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
+    final authService = Provider.of<AuthService>(context);
+
     return Container(
       margin: const EdgeInsets.only(top: 40),
       padding: const EdgeInsets.symmetric(horizontal: 50),
       child: Column(
         children: [
-          CustomInput(
-            icon: Icons.perm_identity,
-            placeholder: 'Name',
-            textController: nameCtrl,
-          ),
           CustomInput(
             icon: Icons.mail_outline,
             placeholder: 'Email',
@@ -68,10 +67,22 @@ class __FormState extends State<_Form> {
             isPassword: true,
           ),
           BlueButton(
-              text: 'Login',
-              onPressed: () {
-                print('HOLA');
-              }),
+            text: 'Login',
+            onPressed: authService.autenticando
+                ? null
+                : () async {
+                    FocusScope.of(context).unfocus();
+                    final loginOK = await authService.login(emailCtrl.text.trim(), passCtrl.text.trim());
+
+                    if (loginOK) {
+                      //  TODO: Conectar al socket server
+                      Navigator.pushReplacementNamed(context, 'users');
+                    } else {
+                      // Mostrar alerta
+                      mostrarAlerta(context, 'Login incorrecto', 'Revise sus credenciales nuevamente');
+                    }
+                  },
+          ),
         ],
       ),
     );
