@@ -4,6 +4,9 @@ import 'package:provider/provider.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 
 import 'package:chat_app/models/user.dart';
+import 'package:chat_app/services/users_service.dart';
+import 'package:chat_app/services/chat_service.dart';
+import 'package:chat_app/services/socket_service.dart';
 import 'package:chat_app/services/auth_service.dart';
 
 class UsersPage extends StatefulWidget {
@@ -14,22 +17,35 @@ class UsersPage extends StatefulWidget {
 }
 
 class _UsersPageState extends State<UsersPage> {
+  final usersService = UsersService();
+
   final RefreshController _refreshController = RefreshController(initialRefresh: false);
 
-  final users = [
-    User(online: true, email: 'test1@test.com', name: 'Maria', uid: '1'),
-    User(online: false, email: 'test2@test.com', name: 'Melissa', uid: '2'),
-    User(online: true, email: 'test3@test.com', name: 'Fernando', uid: '3'),
-  ];
+  List<User> users = [];
+
+  // final users = [
+  //   User(online: true, email: 'test1@test.com', name: 'Maria', uid: '1'),
+  //   User(online: false, email: 'test2@test.com', name: 'Melissa', uid: '2'),
+  //   User(online: true, email: 'test3@test.com', name: 'Fernando', uid: '3'),
+  // ];
+
+  @override
+  void initState() {
+    _loadUsers();
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context);
+    final socketService = Provider.of<SocketService>(context);
+
+    final usuario = authService.usuario;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          authService.usuario.name,
+          usuario.name,
           style: const TextStyle(color: Colors.black54),
         ),
         centerTitle: true,
@@ -38,7 +54,9 @@ class _UsersPageState extends State<UsersPage> {
         leading: IconButton(
           icon: const Icon(Icons.exit_to_app, color: Colors.black54),
           onPressed: () {
-            // TODO: Desconectarnos del socket server
+            // Desconectarnos del socket server
+            socketService.disconnect();
+            // Navegar a LoginPage
             Navigator.pushReplacementNamed(context, 'login');
             AuthService.deleteToken();
           },
@@ -46,8 +64,9 @@ class _UsersPageState extends State<UsersPage> {
         actions: [
           Container(
             margin: const EdgeInsets.only(right: 10),
-            // child: Icon(Icons.check_circle, color: Colors.blue[400]),
-            child: const Icon(Icons.offline_bolt, color: Colors.red),
+            child: socketService.serverStatus == ServerStatus.Online
+                ? Icon(Icons.check_circle, color: Colors.blue[400])
+                : const Icon(Icons.offline_bolt, color: Colors.red),
           )
         ],
       ),
@@ -59,28 +78,20 @@ class _UsersPageState extends State<UsersPage> {
           complete: Icon(Icons.check, color: Colors.blue[400]),
           waterDropColor: Colors.blue[400]!,
         ),
-        child: _ListViewUsers(users: users),
+        child: _listViewUsers(),
       ),
     );
   }
 
   _loadUsers() async {
-    await Future.delayed(const Duration(milliseconds: 1000));
+    users = await usersService.getUsers();
+    setState(() {});
+    // await Future.delayed(const Duration(milliseconds: 1000));
     // if failed,use refreshFailed()
     _refreshController.refreshCompleted();
   }
-}
 
-class _ListViewUsers extends StatelessWidget {
-  const _ListViewUsers({
-    Key? key,
-    required this.users,
-  }) : super(key: key);
-
-  final List<User> users;
-
-  @override
-  Widget build(BuildContext context) {
+  _listViewUsers() {
     return ListView.separated(
       physics: const BouncingScrollPhysics(),
       itemBuilder: (_, i) => _UserListTile(user: users[i]),
@@ -115,6 +126,11 @@ class _UserListTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(100),
         ),
       ),
+      onTap: () {
+        final chatService = Provider.of<ChatService>(context, listen: false);
+        chatService.targetUser = user;
+        Navigator.pushNamed(context, 'chat');
+      },
     );
   }
 }
